@@ -10,7 +10,8 @@ const PORT = process.env.PORT || 5001; // .env'deki portu veya varsayılanı kul
 app.use(cors({
   origin: [
     'http://localhost:5173', // Vite (React) local portu
-    'http://localhost:3000'  // Gerekirse eski portu da bırakabilirsiniz
+    'http://localhost:3000', // Gerekirse eski portu da bırakabilirsiniz
+    'https://bilsemc2-resim-uyg.netlify.app' // Netlify canlı adresin
   ],
   credentials: true
 }));
