@@ -24,7 +24,7 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));
 const wordList = [
   'Macera', 'Okyanus', 'Fısıltı', 'Kristal', 'Gölge', 'Melankoli', 'Harabe', 'Gelecek', 'Robot', 'Rüya',
   'Labirent', 'Umut', 'Gizem', 'Galaksi', 'Şehir', 'Sessizlik', 'Dans', 'Ateş', 'Buz', 'Zaman', 'Işık',
-  'Ayna', 'Maske', 'Anahtar', 'Kitap', 'Müzik', 'Saat', 'Köprü', 'Yolculuk', 'Dağ'
+  'Ayna', 'Maske', 'Anahtar', 'Kitap', 'Müzik', 'Saat', 'Köprü', 'Yolculuk', 'Dağ', 'Saman', 'Merdiven', 'Kapalı'
 ];
 
 // --- API Rotaları (Endpoints) ---
