@@ -11,7 +11,7 @@ app.use(cors({
   origin: [
     'http://localhost:5173', // Vite (React) local portu
     'http://localhost:3000', // Gerekirse eski portu da bırakabilirsiniz
-    'https://bilsemc2-gorsel-sanatlar.netlify.app/' // Netlify canlı adresin
+    'https://bilsemc2-gorsel-sanatlar.netlify.app' // Netlify canlı adresin
   ],
   credentials: true
 }));
