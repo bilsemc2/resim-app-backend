@@ -11,7 +11,7 @@ app.use(cors({
   origin: [
     'http://localhost:5173', // Vite (React) local portu
     'http://localhost:3000', // Gerekirse eski portu da bırakabilirsiniz
-    'https://bilsemc2-resim-uyg.netlify.app' // Netlify canlı adresin
+    'https://bilsemc2-gorsel-sanatlar.netlify.app/' // Netlify canlı adresin
   ],
   credentials: true
 }));
@@ -169,7 +169,7 @@ app.post('/api/evaluate/image-replication', async (req, res) => {
     const response = await axios.post(
         'https://api.openai.com/v1/chat/completions',
         {
-            model: 'pt-4o',
+            model: 'gpt-4o',
             messages: [
                 {
                     role: 'user',
