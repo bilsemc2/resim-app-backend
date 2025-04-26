@@ -15,6 +15,7 @@ app.use(cors({
     'https://bilsemc2-gorsel-sanatlar.netlify.app', // Netlify canlı adresin
     'https://bilsemresim.com',
     'https://www.bilsemresim.com'
+    
 
   ],
   credentials: true
@@ -46,7 +47,7 @@ app.get('/api/random-words', async (req, res) => {
       {
         model: 'gpt-4o',
         messages: [
-          { role: 'system', content: 'Sen bir ilkokul öğretmenisin.' },
+          { role: 'system', content: 'Sen bir ilkokul resim öğretmenisin.' },
           { role: 'user', content: prompt }
         ],
         max_tokens: 20,
@@ -91,7 +92,7 @@ Alp, Kutlu, Tegin, Bars, İlter, Arslan, Kara, Tunga, Yıldırım, Börü, Bağa
       {
         model: 'gpt-4o',
         messages: [
-          { role: 'system', content: 'Sen yaratıcı bir hikaye yazarı ve öğretmensin.' },
+          { role: 'system', content: 'Sen yaratıcı bir hikaye yazarı ve ilkokul resim öğretmenisin.' },
           { role: 'user', content: prompt }
         ],
         max_tokens: 100,
@@ -567,6 +568,184 @@ app.post('/api/generate/word-drawing', async (req, res) => {
   }
 });
 // --- YENİ ROTA SONU ---
+
+// Bağımsız Resim Analiz API'sı (OpenAI Vision API ile)
+app.post('/api/evaluate/independent-art', async (req, res) => {
+  const { image } = req.body;
+  if (!image) {
+    return res.status(400).json({ message: 'Görsel zorunludur.' });
+  }
+  try {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) throw new Error('OpenAI API Anahtarı bulunamadı.');
+
+    // OpenAI Vision API formatında görseli gönder
+    const messages = [
+      {
+        role: 'system',
+        content: [
+          { type: 'text', text: 'Sen deneyimli bir sanat öğretmenisin. Çocuklara uygun, pozitif, motive edici ve yapıcı geri bildirimler veriyorsun. Yorumlarında asla kırıcı olmazsın.' }
+        ]
+      },
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text:
+            `Aşağıdaki görseli analiz et:
+1. İlk paragrafta, resmin güçlü ve başarılı yönlerini öv ve motive edici şekilde anlat.
+2. İkinci paragrafta, geliştirilmesi veya iyileştirilmesi gereken eksik yanları yapıcı, teşvik edici ve çocukları cesaretlendiren bir dille belirt. (Örneğin: "Şunu da deneyebilirsin...", "Bir dahaki sefere ... eklemeyi düşünebilirsin" gibi önerilerle.)
+Her iki paragrafı da ayrı yaz. Sadece sanat eğitmeni gibi kısa, sade ve çocuk dostu konuş.` },
+          { type: 'image_url', image_url: { url: `data:image/png;base64,${image}` } }
+        ]
+      }
+    ];
+
+    const aiRes = await axios.post(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        model: 'gpt-4o',
+        messages,
+        max_tokens: 250,
+        temperature: 1.0
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    const result = aiRes.data.choices?.[0]?.message?.content || 'Açıklama üretilemedi.';
+    res.json({ result });
+  } catch (error) {
+    const openaiError = error?.response?.data || error.message;
+    console.error('Bağımsız resim analiz hatası:', openaiError);
+    res.status(500).json({ message: 'Bağımsız resim analizi başarısız.' });
+  }
+});
+
+// Dijital Kopya Oluşturma API'sı
+const fs = require('fs');
+const path = require('path');
+const FormData = require('form-data');
+
+app.post('/api/generate/digital-copy', async (req, res) => {
+  // image: base64-data URI, mask: opsiyonel base64-data URI
+  const { image, mask } = req.body;
+
+  if (!image) {
+    return res.status(400).json({ message: 'Görsel (base64) zorunlu.' });
+  }
+
+  try {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) throw new Error('OpenAI API anahtarı bulunamadı.');
+
+    // Eğer mask varsa, DALL·E edit API ile renklendirme yap
+    if (mask) {
+      // Geçici dosya kaydet
+      const imgPath  = path.join(__dirname, 'tmp_original.png');
+      const maskPath = path.join(__dirname, 'tmp_mask.png');
+      // Base64'ten dosya oluştur
+      fs.writeFileSync(imgPath,  Buffer.from(image.replace(/^data:image\/\w+;base64,/, ''), 'base64'));
+      fs.writeFileSync(maskPath, Buffer.from(mask.replace(/^data:image\/\w+;base64,/, ''), 'base64'));
+
+      const form = new FormData();
+      form.append('model', 'dall-e-edit-001');
+      form.append('image', fs.createReadStream(imgPath));
+      form.append('mask',  fs.createReadStream(maskPath));
+      form.append('prompt', 'Canlı, parlak renklerle bu karakalem portreyi renklendir. Doğal tonlar kullan.');
+      form.append('n', 1);
+      form.append('size', '1024x1024');
+
+      const dalleEditResp = await axios.post(
+        'https://api.openai.com/v1/images/edits',
+        form,
+        {
+          headers: {
+            ...form.getHeaders(),
+            Authorization: `Bearer ${apiKey}`
+          }
+        }
+      );
+
+      // Geçici dosyaları sil
+      fs.unlinkSync(imgPath);
+      fs.unlinkSync(maskPath);
+
+      const editImageUrl = dalleEditResp.data.data[0]?.url;
+      if (!editImageUrl) throw new Error('DALL·E edit ile görsel üretilemedi.');
+      return res.json({ imageUrl: editImageUrl });
+    }
+
+    // Mask yoksa klasik üretim (Vision + DALL·E-3)
+    const visionResp = await axios.post(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content: 'Sen bir sanat asistanısın. Sadece sahnedeki nesneleri kısa ve sade şekilde listeler misin?'
+          },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Bu görselde ne var? Kısa bir tanım yap.' },
+              {
+                type: 'image_url',
+                image_url: { url: `data:image/png;base64,${image}`, detail: 'low' }
+              }
+            ]
+          }
+        ],
+        max_tokens: 80,
+        temperature: 0.7
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    let promptText = visionResp.data.choices[0].message.content
+      .split(/[\r\n\.]/)[0]
+      .slice(0, 200);
+
+    if (!promptText || promptText.length < 10) {
+      promptText = 'A simple colorful childlike drawing of the scene.';
+    }
+    // Crayon style için prompt'u zenginleştir
+    const dalleCrayonPrompt = `${promptText}. Crayon style, children's drawing, vivid colors, bold outlines, simple shapes.`;
+
+    const dalleResp = await axios.post(
+      'https://api.openai.com/v1/images/generations',
+      {
+        model: 'dall-e-3',
+        prompt: dalleCrayonPrompt,
+        n: 1,
+        size: '1024x1024'
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    const newImageUrl = dalleResp.data.data[0].url;
+    if (!newImageUrl) throw new Error('Dijital kopya üretilemedi.');
+    res.json({ imageUrl: newImageUrl });
+
+  } catch (err) {
+    console.error('Dijital kopya oluşturma hatası:', err.response?.data || err.message);
+    res.status(500).json({ message: 'Dijital kopya üretilemedi.' });
+  }
+});
+
 // --- Sunucuyu Başlatma ---
 app.listen(PORT, () => {
   console.log(`Backend sunucusu http://localhost:${PORT} adresinde çalışıyor.`);
